@@ -62,15 +62,11 @@ exports.createPost = (req, res, next) => {
         })
         .then(user => {
             creator = user;
-            user.posts.push(post);
-            console.log("creator", creator);
-            
+            user.posts.push(post);            
             return user.save();
            
         })
         .then(result => {
-            console.log(result);
-            
             res.status(201).json({
                 message: 'Post created successfully',
                 post: post,
@@ -132,7 +128,12 @@ exports.updatePost = (req, res, next) => {
         .then(post => {
             if (!post) {
                 const error = new Error('Could not find post.');
-                error.status = 422;
+                error.status = 404;
+                throw error;
+            }
+            if (post.creator.toString() !== req.userId) {
+                const error = new Error('Not Authorized');
+                error.statusCode = 403;
                 throw error;
             }
             if (imageUrl !== post.imageUrl) {
@@ -160,16 +161,26 @@ exports.deletePost = (req, res, next) => {
         .then(post => {
             if (!post) {
                 const error = new Error('Could not find post.');
-                error.status = 422;
+                error.status = 404;
+                throw error;
+            }
+            if (post.creator.toString() !== req.userId) {
+                const error = new Error('Not Authorized');
+                error.statusCode = 403;
                 throw error;
             }
             clearImage(post.imageUrl);
             return Post.findByIdAndRemove(postId);
         })
         .then(result => {
-            console.log(result);
+            return User.findById(req.userId);
+        })
+        .then(user => {
+            user.posts.pull(postId);
+            return user.save();
+        })
+        .then(result => {
             res.status(200).json({ message: 'Deleted post.'});
-            
         })
         .catch(err => {
             if (!err.statusCode) {
